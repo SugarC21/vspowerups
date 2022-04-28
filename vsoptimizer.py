@@ -63,6 +63,11 @@ Magnet = power_up(2, 300, "Magnet")
 Luck = power_up(3, 600, "Luck")
 Growth = power_up(5, 900, "Growth")
 Greed = power_up(5, 200, "Greed")
+Curse = power_up(5, 1666, "Curse")
+Revival = power_up(1, 10000, "Revival")
+Reroll = power_up(4, 5000, "Reroll")
+Skip = power_up(3, 200, "Skip")
+Banish = power_up(3, 200, "Banish")
 
 
 def optimize(powerups):
@@ -223,7 +228,7 @@ class PowerUpsWidget(ttk.Frame):
 
 
 class App(ttk.Frame):
-    GAME_VERSION = "v0.2.8a"
+    GAME_VERSION = "v0.5.1"
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
