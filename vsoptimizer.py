@@ -3,6 +3,8 @@ from collections import defaultdict
 from tkinter import font, ttk
 
 
+minimize = 0
+
 class PowerUp:
     MAX_TIER = 0
     BASE_COST = 0
@@ -15,20 +17,10 @@ class PowerUp:
         return self.__class__.__name__
 
     def upgrade_cost(self, n_upgrades):
-        cost = self.BASE_COST // 10
-        n = 10 + n_upgrades
-        if self.target_tier == 0:
-            return 0
-        elif self.target_tier == 1:
-            return n * cost
-        elif self.target_tier == 2:
-            return (3 * n + 2) * cost
-        elif self.target_tier == 3:
-            return (6 * n + 8) * cost
-        elif self.target_tier == 4:
-            return (10 * n + 20) * cost
-        else:
-            return (15 * n + 40) * cost
+        c = self.BASE_COST
+        n = self.target_tier
+        t = n_upgrades
+        return second(c,n,t)
 
     def score(self):
         return (self.target_tier + 1) * self.BASE_COST
@@ -40,6 +32,23 @@ class PowerUp:
         return self.__class__ is other.__class__ and self.target_tier == other.target_tier
 
 
+
+
+def first(c,n,t):
+    return (n+1)*c+(n+1)*(t*c)/10.0
+
+def second(c,n,t):
+    if n == 0:
+        return 0
+    mylist = [0]
+    Answer = 0
+    x=1;
+    while x != n+1:
+        mylist.insert(0, first(c,x-1,x-1+t) + 0.0)
+        x = x + 1
+    return sum(mylist);    
+        
+        
 POWER_UPS = []
 
 
@@ -65,13 +74,24 @@ Growth = power_up(5, 900, "Growth")
 Greed = power_up(5, 200, "Greed")
 Curse = power_up(5, 1666, "Curse")
 Revival = power_up(1, 10000, "Revival")
-Reroll = power_up(4, 5000, "Reroll")
-Skip = power_up(3, 200, "Skip")
-Banish = power_up(3, 200, "Banish")
+Reroll = power_up(4, 1000, "Reroll")
+Skip = power_up(3, 100, "Skip")
+Banish = power_up(3, 100, "Banish")
 
 
+##MaxMoney
 def optimize(powerups):
     pups = sorted(powerups, key=lambda p: p.score(), reverse=True)
+    n_upgrades = 0
+    total_cost = 0
+    for pup in pups:
+        total_cost += pup.upgrade_cost(n_upgrades)
+        n_upgrades += pup.target_tier
+    return total_cost, pups
+
+def exacerbate(powerups):
+    pups = sorted(powerups, key=lambda p: p.score(), reverse=True)
+    pups.reverse()
     n_upgrades = 0
     total_cost = 0
     for pup in pups:
@@ -147,7 +167,7 @@ class PowerUpsWidget(ttk.Frame):
             cost_frame,
             textvariable=self.var_total_cost,
             style="LargeBold.TLabel",
-            width=5,
+            width=6,
         )
         cost_label.grid(row=0, column=1)
 
@@ -183,15 +203,36 @@ class PowerUpsWidget(ttk.Frame):
         listframe.grid(row=2, column=1, sticky=EXPAND)
 
         buttons_frame = ttk.Frame(self)
+        buttons_frame.columnconfigure((0, 4), pad = 50)
         buttons_frame.grid(row=4, column=0, columnspan=2, pady=15)
         ttk.Button(buttons_frame, text="Reset", command=self.on_press_reset).grid(row=0, column=2)
         ttk.Button(buttons_frame, text="Max All", command=self.on_press_max_all).grid(
             row=0, column=3
         )
+##        ttk.Button(buttons_frame, text="Exacerbate", command=self.on_press_exacerbate).grid(
+##            row=0, column=4
+##        )
+        global checkbox
+        checkbox = tkinter.IntVar()
+        ttk.Checkbutton(buttons_frame, text="Reverse",command=self.on_press_update,
+                        variable=checkbox).grid(row=0, column=4)
 
+    def toggle():
+        global checkbox
+        if checkbox.get() == 0:
+            global minimize
+            minimize = 1
+            
     def on_tier_update(self, event):
+        global minimize
+        global checkbox
+        minimize = checkbox.get()
         powerups = [w.powerup for w in self.widgets.values()]
-        total_cost, order = optimize(powerups)
+        if minimize == 0:
+            total_cost, order = optimize(powerups)
+        else:
+            total_cost, order = exacerbate(powerups)
+
 
         self.var_total_cost.set(total_cost)
         self.var_listbox.set([f"{p.target_tier}x {p.name}" for p in order if p.target_tier > 0])
@@ -204,7 +245,7 @@ class PowerUpsWidget(ttk.Frame):
                 powerup.target_tier += 1
                 next_cost, _ = optimize(powerups)
                 powerup.target_tier -= 1
-                widget.var_buy_cost.set(str(next_cost - total_cost))
+                widget.var_buy_cost.set(str(abs(next_cost - total_cost)))
 
             if powerup.target_tier == 0:
                 widget.var_sell_cost.set("-")
@@ -212,12 +253,45 @@ class PowerUpsWidget(ttk.Frame):
                 powerup.target_tier -= 1
                 next_cost, _ = optimize(powerups)
                 powerup.target_tier += 1
-                widget.var_sell_cost.set(str(total_cost - next_cost))
+                widget.var_sell_cost.set(str(abs(total_cost - next_cost)))
+
+    def on_press_update(self):
+        global minimize
+        global checkbox
+        minimize = checkbox.get()
+        powerups = [w.powerup for w in self.widgets.values()]
+        if minimize == 0:
+            total_cost, order = optimize(powerups)
+        else:
+            total_cost, order = exacerbate(powerups)
+
+
+        self.var_total_cost.set(total_cost)
+        self.var_listbox.set([f"{p.target_tier}x {p.name}" for p in order if p.target_tier > 0])
+
+        for widget in self.widgets.values():
+            powerup = widget.powerup
+            if powerup.target_tier == powerup.MAX_TIER:
+                widget.var_buy_cost.set("-")
+            else:
+                powerup.target_tier += 1
+                next_cost, _ = optimize(powerups)
+                powerup.target_tier -= 1
+                widget.var_buy_cost.set(str(abs(next_cost - total_cost)))
+
+            if powerup.target_tier == 0:
+                widget.var_sell_cost.set("-")
+            else:
+                powerup.target_tier -= 1
+                next_cost, _ = optimize(powerups)
+                powerup.target_tier += 1
+                widget.var_sell_cost.set(str(abs(total_cost - next_cost)))
+        self.winfo_toplevel().event_generate("<<PowerUpTierUpdate>>")
 
     def on_press_reset(self):
         for w in self.widgets.values():
             w.var_tier.set(0)
-            w.powerup.target_tier = 0
+            w.powerup.target_tier = 0;
         self.winfo_toplevel().event_generate("<<PowerUpTierUpdate>>")
 
     def on_press_max_all(self):
@@ -226,9 +300,18 @@ class PowerUpsWidget(ttk.Frame):
             w.powerup.target_tier = w.powerup.MAX_TIER
         self.winfo_toplevel().event_generate("<<PowerUpTierUpdate>>")
 
+    def on_press_exacerbate(self):
+        global minimize
+        print(minimize)
+        for w in self.widgets.values():
+            w.var_tier.set(w.powerup.MAX_TIER)
+            w.powerup.target_tier = w.powerup.MAX_TIER
+        self.winfo_toplevel().event_generate("<<PowerUpTierUpdate>>")
+        
+
 
 class App(ttk.Frame):
-    GAME_VERSION = "v0.5.1"
+    GAME_VERSION = "v0.5.1 - EA"
 
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
